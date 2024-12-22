@@ -1,31 +1,60 @@
 #include "ReplicationFunctionalTest.h"
 #include "BaseReplicatedActor.h"
 #include "Engine/World.h"
+#include "FunctionalTestingManager.h"
+#include "Engine/Engine.h"
+
+
+class FCheckColorChangeLatentCommand final : public IAutomationLatentCommand
+{
+public:
+    FCheckColorChangeLatentCommand(AReplicationFunctionalTest* InTest, ABaseReplicatedActor* InTestCube)
+        : Test(InTest), TestCube(InTestCube) {}
+
+    virtual bool Update() override
+    {
+        if (TestCube->CubeColor == FLinearColor::Green)
+        {
+            Test->FinishTest(EFunctionalTestResult::Succeeded, TEXT("TestCube color changed successfully."));
+        }
+        else
+        {
+            Test->FinishTest(EFunctionalTestResult::Failed, TEXT("TestCube color did not change."));
+        }
+        return true;
+    }
+
+private:
+    AReplicationFunctionalTest* Test;
+    ABaseReplicatedActor* TestCube;
+};
 
 void AReplicationFunctionalTest::StartTest()
 {
     Super::StartTest();
 
-    // Spawn our replicated actor
+    // Delta cubes! Delta cubes! Delta cubes!
     FActorSpawnParameters SpawnParams;
     SpawnParams.Owner = this;
     TestCube = GetWorld()->SpawnActor<ABaseReplicatedActor>(ABaseReplicatedActor::StaticClass(), FVector::ZeroVector, FRotator::ZeroRotator, SpawnParams);
 
+    // No cube? :(
     if (!TestCube)
     {
         FinishTest(EFunctionalTestResult::Failed, TEXT("Could not spawn TestCube"));
         return;
     }
 
-    // Basic check: Is replication enabled?
+    // No replication? Double :(
     if (!TestCube->GetIsReplicated())
     {
         FinishTest(EFunctionalTestResult::Failed, TEXT("TestCube not replicating"));
         return;
     }
 
-    // We could implement a latent test to wait a few seconds and verify color changes,
-    // but for simplicity, pass immediately. In a real scenario, you'd add delays or use
-    // the Functional Testing framework's latent commands to check after time passes.
-    FinishTest(EFunctionalTestResult::Succeeded, TEXT("TestCube is replicating properly."));
+    // Change color to green, check if it changed
+    ADD_LATENT_AUTOMATION_COMMAND(FWaitLatentCommand(0.5f));
+    ADD_LATENT_AUTOMATION_COMMAND(FCheckColorChangeLatentCommand(this, TestCube));
+    ADD_LATENT_AUTOMATION_COMMAND(FWaitLatentCommand(0.5f));
+    ADD_LATENT_AUTOMATION_COMMAND(FExecStringLatentCommand(TEXT("TestCube->RequestColorChange(FLinearColor::Green);")));
 }
