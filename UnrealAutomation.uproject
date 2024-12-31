@@ -46,6 +46,10 @@
 		{
 			"Name": "TestSamples",
 			"Enabled": true
+		},
+		{
+			"Name": "PythonFoundationPackages",
+			"Enabled": true
 		}
 	]
 }
